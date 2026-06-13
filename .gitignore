@@ -5,5 +5,4 @@ database.sqlite-wal
 recordings/
 *.mp4
 .env
-public/mediasoup-client.js
 .DS_Store
