@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard — VideoSupport</title>
+  <meta name="description" content="Admin view of all live support sessions."/>
+  <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ─── LOGIN ────────────────────────────────────────────────────────────────── -->
+<div id="loginView" class="login-wrap">
+  <div class="card login-card">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;margin-bottom:1.5rem;text-align:center">
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <div class="logo-dot"></div>
+        <span style="font-size:1.3rem;font-weight:700">VideoSupport</span>
+      </div>
+      <span class="badge badge-agent">Admin Dashboard</span>
+    </div>
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:1.1rem">
+      <div class="form-group">
+        <label class="form-label" for="adminUser">Username</label>
+        <input class="form-input" id="adminUser" type="text" value="admin"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="adminPass">Password</label>
+        <input class="form-input" id="adminPass" type="password" value="admin123"/>
+      </div>
+      <button class="btn btn-primary btn-lg w-full" id="loginBtn" type="submit">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── DASHBOARD ─────────────────────────────────────────────────────────────── -->
+<div id="adminView" class="hidden">
+  <div class="dashboard-layout">
+
+    <!-- Header -->
+    <div class="dashboard-header">
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <span style="font-size:1.15rem;font-weight:700">VideoSupport</span>
+        <span class="badge badge-agent">Admin</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <div id="pollStatus" style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--text-dim)">
+          <span class="dot dot-pulse" style="background:var(--success)"></span>
+          Auto-refresh every 5s
+        </div>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign Out</button>
+        <a href="/agent.html" class="btn btn-ghost btn-sm">Agent →</a>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem">
+      <div class="card card-sm" style="display:flex;flex-direction:column;gap:0.25rem">
+        <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-mute)">Live Sessions</span>
+        <span id="statLive" style="font-size:2rem;font-weight:700;color:var(--accent)">—</span>
+      </div>
+      <div class="card card-sm" style="display:flex;flex-direction:column;gap:0.25rem">
+        <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-mute)">Active Participants</span>
+        <span id="statParticipants" style="font-size:2rem;font-weight:700;color:var(--success)">—</span>
+      </div>
+      <div class="card card-sm" style="display:flex;flex-direction:column;gap:0.25rem">
+        <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-mute)">Last Updated</span>
+        <span id="statUpdated" style="font-size:1rem;font-weight:500;color:var(--text-dim)">—</span>
+      </div>
+    </div>
+
+    <!-- Live Sessions Table -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem">
+        <h3>Live Sessions</h3>
+        <span class="badge badge-active" id="liveCount"><span class="dot dot-pulse"></span> 0 active</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" id="manualRefreshBtn">Refresh Now</button>
+      </div>
+      <div class="table-wrap" style="border:none;border-radius:0">
+        <table>
+          <thead><tr>
+            <th>Session ID</th>
+            <th>Participants</th>
+            <th>Duration</th>
+            <th>Has Router</th>
+            <th>Action</th>
+          </tr></thead>
+          <tbody id="liveTableBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-mute);padding:2.5rem">
+              <div class="spinner" style="margin:0 auto;width:28px;height:28px"></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Session History Table -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+        <h3>All Sessions</h3>
+      </div>
+      <div class="table-wrap" style="border:none;border-radius:0">
+        <table>
+          <thead><tr>
+            <th>Session ID</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Ended</th>
+          </tr></thead>
+          <tbody id="histTableBody">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:2rem">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem('admin_token');
+let pollInterval = null;
+
+function toast(msg, type = 'info', duration = 3000) {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  const icons = { info: 'ℹ️', success: '✅', error: '❌', warning: '⚠️' };
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+function showView(id) {
+  ['loginView','adminView'].forEach(v =>
+    document.getElementById(v).classList.toggle('hidden', v !== id)
+  );
+}
+
+if (token) { showView('adminView'); startPolling(); loadHistory(); }
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('adminUser').value, password: document.getElementById('adminPass').value }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    token = data.token;
+    localStorage.setItem('admin_token', token);
+    showView('adminView');
+    startPolling();
+    loadHistory();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('admin_token');
+  token = null;
+  clearInterval(pollInterval);
+  showView('loginView');
+});
+
+document.getElementById('manualRefreshBtn').addEventListener('click', refreshLive);
+
+function startPolling() {
+  refreshLive();
+  pollInterval = setInterval(refreshLive, 5000);
+}
+
+async function refreshLive() {
+  try {
+    const r = await fetch('/api/admin/live', { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) { if (r.status === 401) { localStorage.removeItem('admin_token'); showView('loginView'); clearInterval(pollInterval); } return; }
+    const sessions = await r.json();
+    renderLiveTable(sessions);
+    document.getElementById('statLive').textContent = sessions.length;
+    document.getElementById('statParticipants').textContent = sessions.reduce((s, x) => s + x.participantCount, 0);
+    document.getElementById('statUpdated').textContent = new Date().toLocaleTimeString();
+    document.getElementById('liveCount').innerHTML = `<span class="dot${sessions.length ? ' dot-pulse' : ''}"></span> ${sessions.length} active`;
+  } catch (err) {
+    console.error('Live refresh error:', err);
+  }
+}
+
+function renderLiveTable(sessions) {
+  const tbody = document.getElementById('liveTableBody');
+  if (!sessions.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-mute);padding:2.5rem">No active sessions.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sessions.map(s => {
+    const dur = formatDuration(s.durationMs);
+    const parts = s.participants.map(p => `<span class="badge badge-${p.role}">${escHtml(p.name)}</span>`).join(' ');
+    return `<tr>
+      <td style="font-family:monospace;font-size:0.8rem">${s.sessionId.slice(0,8)}…</td>
+      <td>${parts || `<span style="color:var(--text-mute)">${s.participantCount} connected</span>`}</td>
+      <td>${dur}</td>
+      <td>${s.hasRouter ? '<span class="badge badge-active">✓ Yes</span>' : '<span class="badge badge-ended">✗ No</span>'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="endSession('${s.sessionId}')">End Session</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function endSession(sessionId) {
+  if (!confirm(`End session ${sessionId.slice(0,8)}?`)) return;
+  try {
+    const r = await fetch(`/api/sessions/${sessionId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+    });
+    if (r.ok) { toast('Session ended', 'success'); refreshLive(); loadHistory(); }
+    else toast('Failed to end session', 'error');
+  } catch { toast('Network error', 'error'); }
+}
+
+async function loadHistory() {
+  try {
+    const r = await fetch('/api/sessions', { headers: { Authorization: `Bearer ${token}` } });
+    const sessions = await r.json();
+    const tbody = document.getElementById('histTableBody');
+    if (!sessions.length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:2rem">No sessions yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = sessions.map(s => `<tr>
+      <td style="font-family:monospace;font-size:0.8rem">${s.id.slice(0,8)}…</td>
+      <td><span class="badge badge-${s.status === 'active' ? 'active' : 'ended'}">${s.status}</span></td>
+      <td>${new Date(s.created_at).toLocaleString()}</td>
+      <td>${s.ended_at ? new Date(s.ended_at).toLocaleString() : '—'}</td>
+    </tr>`).join('');
+  } catch {}
+}
+
+function formatDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${m % 60}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

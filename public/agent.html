@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Agent Dashboard — VideoSupport</title>
+  <meta name="description" content="Agent control panel for real-time video support sessions."/>
+  <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+
+<!-- ─── Toast Container ────────────────────────────────────────────────────── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ─── LOGIN VIEW ─────────────────────────────────────────────────────────── -->
+<div id="loginView" class="login-wrap">
+  <div class="card login-card">
+    <div class="logo flex-col items-center gap-1" style="text-align:center;margin-bottom:1.5rem">
+      <div style="display:flex;align-items:center;gap:0.6rem;justify-content:center">
+        <div class="logo-dot"></div>
+        <span style="font-size:1.3rem;font-weight:700;letter-spacing:-0.02em">VideoSupport</span>
+      </div>
+      <p style="font-size:0.85rem">Agent Login</p>
+    </div>
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:1.1rem">
+      <div class="form-group">
+        <label class="form-label" for="loginUser">Username</label>
+        <input class="form-input" id="loginUser" type="text" value="admin" autocomplete="username"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="loginPass">Password</label>
+        <input class="form-input" id="loginPass" type="password" value="admin123" autocomplete="current-password"/>
+      </div>
+      <button class="btn btn-primary btn-lg w-full" id="loginBtn" type="submit">Sign In</button>
+      <p style="text-align:center;font-size:0.8rem;color:var(--text-mute)">Demo: admin / admin123</p>
+    </form>
+  </div>
+</div>
+
+<!-- ─── DASHBOARD VIEW ─────────────────────────────────────────────────────── -->
+<div id="dashboardView" class="hidden">
+  <div class="dashboard-layout">
+    <!-- Header -->
+    <div class="dashboard-header">
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <span style="font-size:1.15rem;font-weight:700">VideoSupport</span>
+        <span class="badge badge-agent">Agent</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <span id="agentName" style="font-size:0.85rem;color:var(--text-dim)"></span>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign Out</button>
+        <a href="/admin.html" class="btn btn-ghost btn-sm">Admin →</a>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+      <div>
+        <h2>Sessions</h2>
+        <p style="margin-top:2px;font-size:0.85rem">Create and manage support calls.</p>
+      </div>
+      <button class="btn btn-primary" id="createSessionBtn">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Session
+      </button>
+    </div>
+
+    <!-- Invite box (hidden until session created) -->
+    <div id="inviteSection" class="card hidden" style="gap:1rem;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h3>📋 Share Invite Link</h3>
+        <button class="btn btn-primary btn-sm" id="joinCallBtn">Join Call →</button>
+      </div>
+      <div class="invite-box">
+        <span id="inviteLinkText"></span>
+        <button class="btn btn-ghost btn-sm" id="copyLinkBtn">Copy</button>
+      </div>
+      <p style="font-size:0.8rem">Send this link to your customer. It's valid for this session only.</p>
+    </div>
+
+    <!-- Sessions table -->
+    <div class="card card-sm" style="padding:0;overflow:hidden">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <h3>Session History</h3>
+        <button class="btn btn-ghost btn-sm" id="refreshSessionsBtn">Refresh</button>
+      </div>
+      <div class="table-wrap" style="border:none;border-radius:0">
+        <table id="sessionsTable">
+          <thead><tr>
+            <th>Session ID</th><th>Status</th><th>Created</th><th>Ended</th>
+          </tr></thead>
+          <tbody id="sessionsBody">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:2rem">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── CALL VIEW ───────────────────────────────────────────────────────────── -->
+<div id="callView" class="hidden" style="height:100vh;overflow:hidden">
+  <div class="call-layout">
+
+    <!-- Video Area -->
+    <div class="video-area" id="videoArea">
+      <!-- Local tile -->
+      <div class="video-tile" id="localTile">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <div class="tile-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span id="localName">You (Agent)</span>
+        </div>
+        <div class="tile-badge"><span class="badge badge-agent">Agent</span></div>
+      </div>
+      <!-- Remote tile -->
+      <div class="video-tile no-video" id="remoteTile">
+        <div class="avatar-icon" id="remoteAvatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span>Waiting for customer…</span>
+        </div>
+        <video id="remoteVideo" autoplay playsinline style="display:none"></video>
+        <div class="tile-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span id="remoteName">Customer</span>
+        </div>
+        <div class="tile-badge"><span class="badge badge-customer">Customer</span></div>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="chat-panel">
+      <div class="chat-header">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        In-Call Chat
+        <span class="badge badge-active" id="chatOnlineBadge"><span class="dot dot-pulse"></span>Live</span>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Type a message…" maxlength="500"/>
+        <button class="btn btn-primary" id="chatSendBtn" style="width:36px;height:36px;padding:0;border-radius:8px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div class="left-controls">
+        <button class="btn-icon" id="muteBtn" title="Mute/Unmute">🎙️</button>
+        <button class="btn-icon" id="videoBtn" title="Camera On/Off">📹</button>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:0.5rem">
+        <div id="recIndicator" style="display:none;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--danger)">
+          <span class="dot dot-pulse" style="background:var(--danger)"></span> Recording
+        </div>
+      </div>
+      <div class="right-controls">
+        <button class="btn btn-warning btn-sm" id="startRecBtn" title="Start Recording">⏺ Record</button>
+        <button class="btn btn-ghost btn-sm hidden" id="stopRecBtn" title="Stop Recording">⏹ Stop Rec</button>
+        <button class="btn btn-danger" id="endCallBtn">📵 End Call</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/mediasoup-client.js"></script>
+<script>
+// ─── Globals ──────────────────────────────────────────────────────────────────
+let token = localStorage.getItem('agent_token');
+let agentName = localStorage.getItem('agent_name') || 'Agent';
+let currentSessionId = null;
+let currentInviteToken = null;
+let socket = null;
+let device = null;
+let sendTransport = null;
+let recvTransport = null;
+let localStream = null;
+let audioProducer = null;
+let videoProducer = null;
+let isMuted = false;
+let isVideoOff = false;
+const remoteStreams = new Map(); // socketId -> MediaStream
+let mySocketId = null;
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3500) {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  const icons = { info: 'ℹ️', success: '✅', error: '❌', warning: '⚠️' };
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+if (token) showDashboard();
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Login failed');
+    token = data.token;
+    agentName = data.name || 'Agent';
+    localStorage.setItem('agent_token', token);
+    localStorage.setItem('agent_name', agentName);
+    showDashboard();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.clear();
+  token = null;
+  showView('loginView');
+});
+
+function showDashboard() {
+  document.getElementById('agentName').textContent = agentName;
+  showView('dashboardView');
+  loadSessions();
+}
+
+// ─── Sessions ─────────────────────────────────────────────────────────────────
+async function loadSessions() {
+  const tbody = document.getElementById('sessionsBody');
+  try {
+    const r = await fetch('/api/sessions', { headers: { Authorization: `Bearer ${token}` } });
+    const sessions = await r.json();
+    if (!sessions.length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:2rem">No sessions yet. Create one above.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = sessions.map(s => `
+      <tr>
+        <td style="font-family:monospace;font-size:0.8rem">${s.id.slice(0,8)}…</td>
+        <td><span class="badge badge-${s.status === 'active' ? 'active' : 'ended'}">${s.status}</span></td>
+        <td>${new Date(s.created_at).toLocaleString()}</td>
+        <td>${s.ended_at ? new Date(s.ended_at).toLocaleString() : '—'}</td>
+      </tr>`).join('');
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger)">Failed to load sessions.</td></tr>`;
+  }
+}
+
+document.getElementById('refreshSessionsBtn').addEventListener('click', loadSessions);
+
+document.getElementById('createSessionBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('createSessionBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/sessions', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    currentSessionId = data.sessionId;
+    currentInviteToken = data.inviteToken;
+    document.getElementById('inviteLinkText').textContent = data.inviteUrl;
+    document.getElementById('inviteSection').classList.remove('hidden');
+    document.getElementById('inviteSection').style.display = 'flex';
+    toast('Session created! Share the invite link.', 'success');
+    loadSessions();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('copyLinkBtn').addEventListener('click', () => {
+  const link = document.getElementById('inviteLinkText').textContent;
+  navigator.clipboard.writeText(link).then(() => toast('Link copied!', 'success'));
+});
+
+document.getElementById('joinCallBtn').addEventListener('click', () => {
+  if (!currentSessionId) return;
+  showView('callView');
+  initCall();
+});
+
+// ─── View Manager ─────────────────────────────────────────────────────────────
+function showView(id) {
+  ['loginView', 'dashboardView', 'callView'].forEach(v => {
+    document.getElementById(v).classList.toggle('hidden', v !== id);
+  });
+}
+
+// ─── Call Initialization ───────────────────────────────────────────────────────
+async function initCall() {
+  document.getElementById('localName').textContent = `${agentName} (You)`;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    document.getElementById('localVideo').srcObject = localStream;
+  } catch (err) {
+    toast('Camera/mic access denied: ' + err.message, 'error');
+    localStream = new MediaStream();
+  }
+
+  socket = io();
+  mySocketId = null;
+
+  socket.on('connect', () => {
+    mySocketId = socket.id;
+    socket.emit('join-session', {
+      sessionId: currentSessionId,
+      token,
+      role: 'agent',
+      displayName: agentName,
+    }, async (resp) => {
+      if (resp.error) { toast(resp.error, 'error'); return; }
+
+      device = new mediasoupClient.Device();
+      await device.load({ routerRtpCapabilities: resp.routerRtpCapabilities });
+
+      await createSendTransport();
+      await createRecvTransport();
+      await produceMedia();
+
+      // Consume existing producers
+      for (const { producerId, peerId, kind } of resp.existingProducers || []) {
+        await consumeProducer(producerId, peerId, kind);
+      }
+    });
+  });
+
+  socket.on('new-producer', async ({ producerId, peerId, kind }) => {
+    await consumeProducer(producerId, peerId, kind);
+  });
+
+  socket.on('peer-joined', ({ socketId, name, role }) => {
+    toast(`${name} joined the call`, 'info');
+    if (role === 'customer') document.getElementById('remoteName').textContent = name;
+  });
+
+  socket.on('peer-left', ({ peerId }) => {
+    toast('Customer left the call', 'warning');
+    remoteStreams.delete(peerId);
+    updateRemoteVideo();
+  });
+
+  socket.on('chat:message', ({ senderName, senderRole, content, sentAt }) => {
+    appendChatMessage(senderName, senderRole, content, sentAt, false);
+  });
+
+  socket.on('peer-muted', ({ socketId, muted }) => {
+    // Could show muted overlay on remote tile
+  });
+
+  socket.on('session-ended', () => {
+    toast('Session ended', 'warning');
+    cleanup();
+    showDashboard();
+  });
+
+  socket.on('recording-status', ({ status, downloadUrl, error }) => {
+    if (status === 'recording') {
+      document.getElementById('recIndicator').style.display = 'flex';
+      toast('Recording started', 'success');
+    } else if (status === 'ready') {
+      document.getElementById('recIndicator').style.display = 'none';
+      toast(`Recording saved! <a href="${downloadUrl}" target="_blank">Download</a>`, 'success', 6000);
+    } else if (status === 'failed') {
+      document.getElementById('recIndicator').style.display = 'none';
+      toast('Recording failed: ' + (error || 'unknown error'), 'error');
+    }
+  });
+}
+
+// ─── Mediasoup Transports ─────────────────────────────────────────────────────
+async function createSendTransport() {
+  return new Promise((resolve, reject) => {
+    socket.emit('create-transport', { direction: 'send' }, (params) => {
+      if (params.error) return reject(params.error);
+      sendTransport = device.createSendTransport(params);
+      sendTransport.on('connect', ({ dtlsParameters }, cb, eb) => {
+        socket.emit('connect-transport', { transportId: sendTransport.id, dtlsParameters }, (r) => r.error ? eb(r.error) : cb());
+      });
+      sendTransport.on('produce', ({ kind, rtpParameters, appData }, cb, eb) => {
+        socket.emit('produce', { transportId: sendTransport.id, kind, rtpParameters, appData }, (r) => r.error ? eb(r.error) : cb({ id: r.id }));
+      });
+      resolve();
+    });
+  });
+}
+
+async function createRecvTransport() {
+  return new Promise((resolve, reject) => {
+    socket.emit('create-transport', { direction: 'recv' }, (params) => {
+      if (params.error) return reject(params.error);
+      recvTransport = device.createRecvTransport(params);
+      recvTransport.on('connect', ({ dtlsParameters }, cb, eb) => {
+        socket.emit('connect-transport', { transportId: recvTransport.id, dtlsParameters }, (r) => r.error ? eb(r.error) : cb());
+      });
+      resolve();
+    });
+  });
+}
+
+async function produceMedia() {
+  if (localStream.getAudioTracks().length > 0) {
+    audioProducer = await sendTransport.produce({ track: localStream.getAudioTracks()[0] });
+  }
+  if (localStream.getVideoTracks().length > 0) {
+    videoProducer = await sendTransport.produce({ track: localStream.getVideoTracks()[0], encodings: [{ maxBitrate: 500000 }], codecOptions: { videoGoogleStartBitrate: 1000 } });
+  }
+}
+
+async function consumeProducer(producerId, peerId, kind) {
+  return new Promise((resolve) => {
+    socket.emit('consume', {
+      producerId,
+      rtpCapabilities: device.rtpCapabilities,
+      transportId: recvTransport.id,
+    }, async (params) => {
+      if (params.error) { console.error('consume error:', params.error); return resolve(); }
+      const consumer = await recvTransport.consume({ id: params.id, producerId: params.producerId, kind: params.kind, rtpParameters: params.rtpParameters });
+      socket.emit('resume-consumer', { consumerId: consumer.id }, () => {});
+
+      if (!remoteStreams.has(peerId)) remoteStreams.set(peerId, new MediaStream());
+      remoteStreams.get(peerId).addTrack(consumer.track);
+      updateRemoteVideo();
+      resolve();
+    });
+  });
+}
+
+function updateRemoteVideo() {
+  const remoteVideo = document.getElementById('remoteVideo');
+  const remoteAvatar = document.getElementById('remoteAvatar');
+  const remoteTile = document.getElementById('remoteTile');
+  const streams = Array.from(remoteStreams.values());
+  if (streams.length > 0) {
+    const combinedStream = new MediaStream();
+    streams.forEach(s => s.getTracks().forEach(t => combinedStream.addTrack(t)));
+    remoteVideo.srcObject = combinedStream;
+    remoteVideo.style.display = 'block';
+    remoteAvatar.style.display = 'none';
+    remoteTile.classList.remove('no-video');
+  } else {
+    remoteVideo.srcObject = null;
+    remoteVideo.style.display = 'none';
+    remoteAvatar.style.display = 'flex';
+    remoteTile.classList.add('no-video');
+  }
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+document.getElementById('muteBtn').addEventListener('click', () => {
+  if (!localStream) return;
+  isMuted = !isMuted;
+  localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = isMuted ? '🔇' : '🎙️';
+  btn.classList.toggle('active', isMuted);
+  socket?.emit('mute-audio', { sessionId: currentSessionId, muted: isMuted });
+  toast(isMuted ? 'Microphone muted' : 'Microphone unmuted', 'info', 1500);
+});
+
+document.getElementById('videoBtn').addEventListener('click', () => {
+  if (!localStream) return;
+  isVideoOff = !isVideoOff;
+  localStream.getVideoTracks().forEach(t => t.enabled = !isVideoOff);
+  const btn = document.getElementById('videoBtn');
+  btn.textContent = isVideoOff ? '🚫' : '📹';
+  btn.classList.toggle('active', isVideoOff);
+  socket?.emit('disable-video', { sessionId: currentSessionId, disabled: isVideoOff });
+  toast(isVideoOff ? 'Camera off' : 'Camera on', 'info', 1500);
+});
+
+document.getElementById('startRecBtn').addEventListener('click', () => {
+  socket?.emit('start-recording', { sessionId: currentSessionId }, (r) => {
+    if (r?.error) { toast(r.error, 'error'); return; }
+    document.getElementById('startRecBtn').classList.add('hidden');
+    document.getElementById('stopRecBtn').classList.remove('hidden');
+  });
+});
+
+document.getElementById('stopRecBtn').addEventListener('click', () => {
+  socket?.emit('stop-recording', { sessionId: currentSessionId }, () => {
+    document.getElementById('stopRecBtn').classList.add('hidden');
+    document.getElementById('startRecBtn').classList.remove('hidden');
+  });
+});
+
+document.getElementById('endCallBtn').addEventListener('click', () => {
+  if (!confirm('End this support session?')) return;
+  socket?.emit('end-session', { sessionId: currentSessionId }, () => {});
+  cleanup();
+  showDashboard();
+});
+
+function cleanup() {
+  localStream?.getTracks().forEach(t => t.stop());
+  localStream = null;
+  if (socket) { socket.disconnect(); socket = null; }
+  sendTransport = null; recvTransport = null;
+  audioProducer = null; videoProducer = null;
+  remoteStreams.clear();
+  isMuted = false; isVideoOff = false;
+  document.getElementById('localVideo').srcObject = null;
+  document.getElementById('remoteVideo').srcObject = null;
+  document.getElementById('chatMessages').innerHTML = '';
+  document.getElementById('recIndicator').style.display = 'none';
+  document.getElementById('startRecBtn').classList.remove('hidden');
+  document.getElementById('stopRecBtn').classList.add('hidden');
+  currentSessionId = null;
+  currentInviteToken = null;
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+document.getElementById('chatSendBtn').addEventListener('click', sendChat);
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const content = input.value.trim();
+  if (!content || !socket || !currentSessionId) return;
+  socket.emit('chat:message', { sessionId: currentSessionId, content, senderName: agentName, senderRole: 'agent' });
+  appendChatMessage(agentName, 'agent', content, Date.now(), true);
+  input.value = '';
+}
+
+function appendChatMessage(name, role, content, sentAt, isOwn) {
+  const panel = document.getElementById('chatMessages');
+  const time = new Date(sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.className = `chat-msg${isOwn ? ' own' : ''}`;
+  div.innerHTML = `
+    <div class="msg-meta">
+      <span class="msg-name">${escHtml(name)}</span>
+      <span class="badge badge-${role}">${role}</span>
+      <span>${time}</span>
+    </div>
+    <div class="msg-body">${escHtml(content)}</div>`;
+  panel.appendChild(div);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

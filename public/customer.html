@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Join Support Call — VideoSupport</title>
+  <meta name="description" content="Join a live video support session."/>
+  <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ─── WAITING / VALIDATE VIEW ─────────────────────────────────────────────── -->
+<div id="waitingView" class="waiting-screen">
+  <div class="spinner"></div>
+  <h2>Joining session…</h2>
+  <p id="waitingMsg">Validating your invite link, please wait.</p>
+</div>
+
+<!-- ─── NAME ENTRY VIEW ─────────────────────────────────────────────────────── -->
+<div id="nameView" class="hidden login-wrap">
+  <div class="card login-card">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;margin-bottom:1.5rem;text-align:center">
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <div class="logo-dot"></div>
+        <span style="font-size:1.3rem;font-weight:700">VideoSupport</span>
+      </div>
+      <p style="font-size:0.85rem">You've been invited to a support call.</p>
+    </div>
+    <form id="nameForm" style="display:flex;flex-direction:column;gap:1.1rem">
+      <div class="form-group">
+        <label class="form-label" for="displayNameInput">Your Name</label>
+        <input class="form-input" id="displayNameInput" type="text" placeholder="e.g. John Smith" autofocus/>
+      </div>
+      <button class="btn btn-primary btn-lg w-full" id="joinBtn" type="submit">Join Call</button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── ERROR VIEW ───────────────────────────────────────────────────────────── -->
+<div id="errorView" class="hidden waiting-screen">
+  <div style="font-size:3rem">🚫</div>
+  <h2 id="errorTitle">Invalid Link</h2>
+  <p id="errorMsg">This invite link is invalid or has expired.</p>
+</div>
+
+<!-- ─── CALL VIEW ────────────────────────────────────────────────────────────── -->
+<div id="callView" class="hidden" style="height:100vh;overflow:hidden">
+  <div class="call-layout">
+
+    <!-- Video Area -->
+    <div class="video-area" id="videoArea">
+      <!-- Local tile -->
+      <div class="video-tile" id="localTile">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <div class="tile-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span id="localName">You</span>
+        </div>
+        <div class="tile-badge"><span class="badge badge-customer">Customer</span></div>
+      </div>
+      <!-- Remote tile (Agent) -->
+      <div class="video-tile no-video" id="remoteTile">
+        <div class="avatar-icon" id="remoteAvatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span>Waiting for agent…</span>
+        </div>
+        <video id="remoteVideo" autoplay playsinline style="display:none"></video>
+        <div class="tile-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span id="remoteName">Support Agent</span>
+        </div>
+        <div class="tile-badge"><span class="badge badge-agent">Agent</span></div>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="chat-panel">
+      <div class="chat-header">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat with Support
+        <span class="badge badge-active" style="margin-left:auto"><span class="dot dot-pulse"></span>Live</span>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Type a message…" maxlength="500"/>
+        <button class="btn btn-primary" id="chatSendBtn" style="width:36px;height:36px;padding:0;border-radius:8px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Controls Bar (no agent controls) -->
+    <div class="controls-bar">
+      <div class="left-controls">
+        <button class="btn-icon" id="muteBtn" title="Mute/Unmute">🎙️</button>
+        <button class="btn-icon" id="videoBtn" title="Camera On/Off">📹</button>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center">
+        <span id="sessionLabel" style="font-size:0.8rem;color:var(--text-mute)">Connected</span>
+      </div>
+      <div class="right-controls">
+        <button class="btn btn-danger" id="leaveBtn">📵 Leave Call</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/mediasoup-client.js"></script>
+<script>
+// ─── Parse token from URL ─────────────────────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search);
+const inviteToken = urlParams.get('token');
+let sessionId = null;
+let displayName = 'Customer';
+let socket = null;
+let device = null;
+let sendTransport = null;
+let recvTransport = null;
+let localStream = null;
+let isMuted = false;
+let isVideoOff = false;
+const remoteStreams = new Map();
+let mySocketId = null;
+
+// ─── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3500) {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  const icons = { info: 'ℹ️', success: '✅', error: '❌', warning: '⚠️' };
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+function showView(id) {
+  ['waitingView','nameView','callView','errorView'].forEach(v =>
+    document.getElementById(v).classList.toggle('hidden', v !== id)
+  );
+}
+
+function showError(title, msg) {
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorMsg').textContent = msg;
+  showView('errorView');
+}
+
+// ─── Validate token by fetching sessions ─────────────────────────────────────
+(async function init() {
+  if (!inviteToken) return showError('No Invite Token', 'Please use the invite link provided by your support agent.');
+
+  // Verify token by attempting a probe (session lookup happens on join)
+  // Just show the name form - server will validate on join
+  showView('nameView');
+})();
+
+// ─── Join form ─────────────────────────────────────────────────────────────────
+document.getElementById('nameForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('displayNameInput').value.trim();
+  if (!name) return;
+  displayName = name;
+  showView('waitingView');
+  document.getElementById('waitingMsg').textContent = 'Connecting to session…';
+  await startCall();
+});
+
+// ─── Call Flow ─────────────────────────────────────────────────────────────────
+async function startCall() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    document.getElementById('localVideo').srcObject = localStream;
+  } catch (err) {
+    toast('Camera/mic access denied: ' + err.message, 'warning');
+    localStream = new MediaStream();
+  }
+
+  socket = io();
+  socket.on('connect', () => {
+    mySocketId = socket.id;
+    socket.emit('join-session', {
+      sessionId: null, // will be resolved via token on server - we need to pass token
+      token: inviteToken,
+      role: 'customer',
+      displayName,
+    }, async (resp) => {
+      if (resp.error) {
+        showError('Cannot Join', resp.error);
+        return;
+      }
+
+      sessionId = resp.sessionId || sessionId;
+      document.getElementById('localName').textContent = displayName + ' (You)';
+      document.getElementById('sessionLabel').textContent = `Session: ${sessionId?.slice(0,8)}…`;
+
+      device = new mediasoupClient.Device();
+      await device.load({ routerRtpCapabilities: resp.routerRtpCapabilities });
+
+      await createSendTransport();
+      await createRecvTransport();
+      await produceMedia();
+
+      for (const { producerId, peerId, kind } of resp.existingProducers || []) {
+        await consumeProducer(producerId, peerId, kind);
+      }
+
+      showView('callView');
+    });
+  });
+
+  socket.on('new-producer', async ({ producerId, peerId, kind }) => {
+    await consumeProducer(producerId, peerId, kind);
+  });
+
+  socket.on('peer-joined', ({ name, role }) => {
+    if (role === 'agent') {
+      document.getElementById('remoteName').textContent = name;
+      toast(`${name} joined the call`, 'info');
+    }
+  });
+
+  socket.on('peer-left', ({ peerId }) => {
+    remoteStreams.delete(peerId);
+    updateRemoteVideo();
+    toast('Support agent left the call', 'warning');
+  });
+
+  socket.on('chat:message', ({ senderName, senderRole, content, sentAt }) => {
+    // Only show messages not sent by us (server broadcasts to all, we added our own already)
+    appendChatMessage(senderName, senderRole, content, sentAt, false);
+  });
+
+  socket.on('session-ended', () => {
+    toast('The session has been ended by the agent.', 'warning', 5000);
+    cleanup();
+    showError('Session Ended', 'This support session has been closed by the agent. Thank you!');
+  });
+}
+
+// The server join-session event requires sessionId. For customer, we need to look up sessionId from token.
+// We override the join by sending token only — but the server needs sessionId.
+// Solution: server finds session by invite_token. Let's patch the socket emit to send token as sessionId placeholder.
+// The server code checks invite_token in session table. We'll send a special marker.
+// NOTE: We rely on the server to resolve sessionId from token — see server patch below.
+
+async function createSendTransport() {
+  return new Promise((resolve, reject) => {
+    socket.emit('create-transport', { direction: 'send' }, (params) => {
+      if (params.error) return reject(new Error(params.error));
+      sendTransport = device.createSendTransport(params);
+      sendTransport.on('connect', ({ dtlsParameters }, cb, eb) => {
+        socket.emit('connect-transport', { transportId: sendTransport.id, dtlsParameters }, r => r.error ? eb(r.error) : cb());
+      });
+      sendTransport.on('produce', ({ kind, rtpParameters, appData }, cb, eb) => {
+        socket.emit('produce', { transportId: sendTransport.id, kind, rtpParameters, appData }, r => r.error ? eb(r.error) : cb({ id: r.id }));
+      });
+      resolve();
+    });
+  });
+}
+
+async function createRecvTransport() {
+  return new Promise((resolve, reject) => {
+    socket.emit('create-transport', { direction: 'recv' }, (params) => {
+      if (params.error) return reject(new Error(params.error));
+      recvTransport = device.createRecvTransport(params);
+      recvTransport.on('connect', ({ dtlsParameters }, cb, eb) => {
+        socket.emit('connect-transport', { transportId: recvTransport.id, dtlsParameters }, r => r.error ? eb(r.error) : cb());
+      });
+      resolve();
+    });
+  });
+}
+
+async function produceMedia() {
+  if (localStream.getAudioTracks().length > 0) {
+    await sendTransport.produce({ track: localStream.getAudioTracks()[0] });
+  }
+  if (localStream.getVideoTracks().length > 0) {
+    await sendTransport.produce({ track: localStream.getVideoTracks()[0], encodings: [{ maxBitrate: 500000 }], codecOptions: { videoGoogleStartBitrate: 1000 } });
+  }
+}
+
+async function consumeProducer(producerId, peerId, kind) {
+  return new Promise((resolve) => {
+    socket.emit('consume', {
+      producerId,
+      rtpCapabilities: device.rtpCapabilities,
+      transportId: recvTransport.id,
+    }, async (params) => {
+      if (params.error) { console.error('consume error:', params.error); return resolve(); }
+      const consumer = await recvTransport.consume({ id: params.id, producerId: params.producerId, kind: params.kind, rtpParameters: params.rtpParameters });
+      socket.emit('resume-consumer', { consumerId: consumer.id }, () => {});
+      if (!remoteStreams.has(peerId)) remoteStreams.set(peerId, new MediaStream());
+      remoteStreams.get(peerId).addTrack(consumer.track);
+      updateRemoteVideo();
+      resolve();
+    });
+  });
+}
+
+function updateRemoteVideo() {
+  const remoteVideo = document.getElementById('remoteVideo');
+  const remoteAvatar = document.getElementById('remoteAvatar');
+  const remoteTile = document.getElementById('remoteTile');
+  const streams = Array.from(remoteStreams.values());
+  if (streams.length > 0) {
+    const combined = new MediaStream();
+    streams.forEach(s => s.getTracks().forEach(t => combined.addTrack(t)));
+    remoteVideo.srcObject = combined;
+    remoteVideo.style.display = 'block';
+    remoteAvatar.style.display = 'none';
+    remoteTile.classList.remove('no-video');
+  } else {
+    remoteVideo.srcObject = null;
+    remoteVideo.style.display = 'none';
+    remoteAvatar.style.display = 'flex';
+    remoteTile.classList.add('no-video');
+  }
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+document.getElementById('muteBtn').addEventListener('click', () => {
+  if (!localStream) return;
+  isMuted = !isMuted;
+  localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = isMuted ? '🔇' : '🎙️';
+  btn.classList.toggle('active', isMuted);
+  socket?.emit('mute-audio', { sessionId, muted: isMuted });
+  toast(isMuted ? 'Microphone muted' : 'Microphone unmuted', 'info', 1500);
+});
+
+document.getElementById('videoBtn').addEventListener('click', () => {
+  if (!localStream) return;
+  isVideoOff = !isVideoOff;
+  localStream.getVideoTracks().forEach(t => t.enabled = !isVideoOff);
+  const btn = document.getElementById('videoBtn');
+  btn.textContent = isVideoOff ? '🚫' : '📹';
+  btn.classList.toggle('active', isVideoOff);
+  socket?.emit('disable-video', { sessionId, disabled: isVideoOff });
+  toast(isVideoOff ? 'Camera off' : 'Camera on', 'info', 1500);
+});
+
+document.getElementById('leaveBtn').addEventListener('click', () => {
+  socket?.emit('leave-session', { sessionId });
+  cleanup();
+  showError('Left Call', 'You have left the support session. You may close this window.');
+});
+
+function cleanup() {
+  localStream?.getTracks().forEach(t => t.stop());
+  localStream = null;
+  if (socket) { socket.disconnect(); socket = null; }
+  sendTransport = null; recvTransport = null;
+  remoteStreams.clear();
+  isMuted = false; isVideoOff = false;
+  document.getElementById('localVideo').srcObject = null;
+  document.getElementById('remoteVideo').srcObject = null;
+}
+
+// ─── Chat ──────────────────────────────────────────────────────────────────────
+document.getElementById('chatSendBtn').addEventListener('click', sendChat);
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const content = input.value.trim();
+  if (!content || !socket || !sessionId) return;
+  socket.emit('chat:message', { sessionId, content, senderName: displayName, senderRole: 'customer' });
+  appendChatMessage(displayName, 'customer', content, Date.now(), true);
+  input.value = '';
+}
+
+function appendChatMessage(name, role, content, sentAt, isOwn) {
+  const panel = document.getElementById('chatMessages');
+  const time = new Date(sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.className = `chat-msg${isOwn ? ' own' : ''}`;
+  div.innerHTML = `
+    <div class="msg-meta">
+      <span class="msg-name">${escHtml(name)}</span>
+      <span class="badge badge-${role}">${role}</span>
+      <span>${time}</span>
+    </div>
+    <div class="msg-body">${escHtml(content)}</div>`;
+  panel.appendChild(div);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
