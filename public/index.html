@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VideoSupport — Real-Time Support Platform</title>
+  <meta name="description" content="A high-performance real-time video support platform with mediasoup SFU, chat, and server-side recording."/>
+  <link rel="stylesheet" href="/style.css"/>
+  <style>
+    :root {
+      --hero-glow: radial-gradient(circle at 50% -20%, rgba(79, 142, 247, 0.15) 0%, transparent 60%);
+    }
+
+    body {
+      background: var(--hero-glow), var(--bg);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .landing-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3.5rem;
+    }
+
+    /* Header styling */
+    .landing-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.8rem;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-mute);
+    }
+
+    .status-dot.online {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse-rec 1.5s infinite;
+    }
+
+    /* Hero section */
+    .hero-section {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    .hero-title {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #ffffff 40%, #88aaff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    /* Portals Grid */
+    .portals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 1rem;
+      animation: slideUp 0.6s ease-out;
+    }
+
+    .portal-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      background: rgba(26, 29, 39, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .portal-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: transparent;
+      transition: background 0.25s ease;
+    }
+
+    .portal-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(79, 142, 247, 0.4);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3), 0 0 1px rgba(79, 142, 247, 0.3);
+    }
+
+    .portal-card.agent:hover::before { background: var(--accent); }
+    .portal-card.customer:hover::before { background: var(--warning); }
+    .portal-card.admin:hover::before { background: var(--danger); }
+
+    .portal-icon {
+      font-size: 2.2rem;
+      line-height: 1;
+    }
+
+    .portal-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .portal-desc {
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--text-dim);
+      flex: 1;
+    }
+
+    .portal-action {
+      margin-top: 0.5rem;
+    }
+
+    /* Special Customer join field inside card */
+    .token-join-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+    }
+
+    .token-input-wrapper {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .token-input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    /* Technical info footer */
+    .tech-info {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-mute);
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .tech-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tech-item svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.6;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+      .portals-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-title {
+        font-size: 2.25rem;
+      }
+      .landing-container {
+        padding: 2rem 1rem;
+        gap: 2.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="landing-container">
+    <!-- Header -->
+    <header class="landing-header">
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <span style="font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em;">VideoSupport</span>
+      </div>
+      <div class="status-badge">
+        <div id="healthDot" class="status-dot"></div>
+        <span id="healthText">Checking system...</span>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero-section">
+      <h1 class="hero-title">Video Support Platform</h1>
+      <p class="hero-subtitle">
+        High-performance real-time video support with mediasoup SFU, secure session invites, dynamic live chat, and fully integrated server-side recording.
+      </p>
+    </section>
+
+    <!-- Portals -->
+    <main class="portals-grid">
+      <!-- Agent Portal Card -->
+      <div class="portal-card agent">
+        <div class="portal-icon">🛠️</div>
+        <h2 class="portal-title">Agent Workspace</h2>
+        <p class="portal-desc">
+          Sign in to initiate support calls, invite clients, manage active troubleshooting rooms, use video/audio streams, and activate server-side MP4 recordings.
+        </p>
+        <div class="portal-action">
+          <a href="/agent.html" id="btnAgentPortal" class="btn btn-primary w-full">Launch Agent Portal</a>
+        </div>
+      </div>
+
+      <!-- Customer Portal Card -->
+      <div class="portal-card customer">
+        <div class="portal-icon">👤</div>
+        <h2 class="portal-title">Customer Join</h2>
+        <p class="portal-desc">
+          Join a support session using the invite token provided by your agent. No credentials required — connect instantly from any modern web browser.
+        </p>
+        <div class="token-join-container">
+          <div class="token-input-wrapper">
+            <input type="text" id="inputCustomerToken" class="form-input token-input" placeholder="Paste Invite Token or URL..." />
+            <button id="btnCustomerJoin" class="btn btn-warning btn-sm">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Portal Card -->
+      <div class="portal-card admin">
+        <div class="portal-icon">📊</div>
+        <h2 class="portal-title">Admin Dashboard</h2>
+        <p class="portal-desc">
+          Monitor system metrics, review live active calls, check participant counts, check database statistics, and inspect server logs.
+        </p>
+        <div class="portal-action">
+          <a href="/admin.html" id="btnAdminPortal" class="btn btn-ghost w-full">Open Admin Panel</a>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer / Tech Specs -->
+    <footer class="tech-info">
+      <div class="tech-item">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.53c-.26-.81-1-1.4-1.9-1.4h-1v-3c0-.55-.45-1-1-1h-6v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.4z"/></svg>
+        <span>mediasoup WebRTC SFU</span>
+      </div>
+      <div class="tech-item">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/></svg>
+        <span>SQLite WAL Persistent DB</span>
+      </div>
+      <div class="tech-item">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        <span>FFmpeg Server-Side Recording</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // System health check
+    async function checkHealth() {
+      const dot = document.getElementById('healthDot');
+      const text = document.getElementById('healthText');
+      try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          const data = await response.json();
+          dot.className = 'status-dot online';
+          text.textContent = 'System Online (Uptime: ' + Math.round(data.uptime) + 's)';
+        } else {
+          dot.className = 'status-dot';
+          text.textContent = 'Server Status: ' + response.status;
+        }
+      } catch (err) {
+        dot.className = 'status-dot';
+        text.textContent = 'Server Offline';
+      }
+    }
+
+    // Initialize check
+    checkHealth();
+    // Refresh health check every 10 seconds
+    setInterval(checkHealth, 10000);
+
+    // Customer join handling
+    const inputToken = document.getElementById('inputCustomerToken');
+    const btnJoin = document.getElementById('btnCustomerJoin');
+
+    function executeJoin() {
+      let rawVal = inputToken.value.trim();
+      if (!rawVal) {
+        alert('Please enter a valid invite token or invitation URL.');
+        return;
+      }
+      
+      // Try to parse URL if customer pasted full URL
+      let token = rawVal;
+      try {
+        const urlObj = new URL(rawVal);
+        const urlParams = new URLSearchParams(urlObj.search);
+        const tokenParam = urlParams.get('token');
+        if (tokenParam) {
+          token = tokenParam;
+        }
+      } catch (e) {
+        // Not a URL, treat as direct token
+      }
+
+      window.location.href = '/customer.html?token=' + encodeURIComponent(token);
+    }
+
+    btnJoin.addEventListener('click', executeJoin);
+    inputToken.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        executeJoin();
+      }
+    });
+  </script>
+</body>
+</html>

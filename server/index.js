@@ -97,6 +97,11 @@ app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 app.use('/recordings', express.static(RECORDINGS_DIR));
 
+// Explicit route for homepage
+app.get('/', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
 // ─── Auth Middleware ───────────────────────────────────────────────────────────
 function requireAgent(req, res, next) {
   const auth = req.headers.authorization;
