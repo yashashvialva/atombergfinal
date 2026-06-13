@@ -2,6 +2,9 @@
   "name": "video-support-platform",
   "version": "1.0.0",
   "description": "Real-Time Video Support Platform with mediasoup SFU",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js"

@@ -121,7 +121,11 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script>
+// Retrieve backend URL configuration
+const BACKEND_URL = (window.APP_CONFIG && window.APP_CONFIG.BACKEND_URL) || window.location.origin;
+
 let token = localStorage.getItem('admin_token');
 let pollInterval = null;
 
@@ -148,7 +152,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
-    const r = await fetch('/api/auth/login', {
+    const r = await fetch(`${BACKEND_URL}/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: document.getElementById('adminUser').value, password: document.getElementById('adminPass').value }),
     });
@@ -182,7 +186,7 @@ function startPolling() {
 
 async function refreshLive() {
   try {
-    const r = await fetch('/api/admin/live', { headers: { Authorization: `Bearer ${token}` } });
+    const r = await fetch(`${BACKEND_URL}/api/admin/live`, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) { if (r.status === 401) { localStorage.removeItem('admin_token'); showView('loginView'); clearInterval(pollInterval); } return; }
     const sessions = await r.json();
     renderLiveTable(sessions);
@@ -217,7 +221,7 @@ function renderLiveTable(sessions) {
 async function endSession(sessionId) {
   if (!confirm(`End session ${sessionId.slice(0,8)}?`)) return;
   try {
-    const r = await fetch(`/api/sessions/${sessionId}`, {
+    const r = await fetch(`${BACKEND_URL}/api/sessions/${sessionId}`, {
       method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
     });
     if (r.ok) { toast('Session ended', 'success'); refreshLive(); loadHistory(); }
@@ -227,7 +231,7 @@ async function endSession(sessionId) {
 
 async function loadHistory() {
   try {
-    const r = await fetch('/api/sessions', { headers: { Authorization: `Bearer ${token}` } });
+    const r = await fetch(`${BACKEND_URL}/api/sessions`, { headers: { Authorization: `Bearer ${token}` } });
     const sessions = await r.json();
     const tbody = document.getElementById('histTableBody');
     if (!sessions.length) {

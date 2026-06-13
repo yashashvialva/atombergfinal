@@ -37,7 +37,11 @@ Login: `admin` / `admin123`
 | `SERVER_IP` | `127.0.0.1` | Local IP for mediasoup ICE |
 | `ANNOUNCED_IP` | same as SERVER_IP | Public IP announced to WebRTC clients (set to your server's public IP in production) |
 
-## Deploy to Railway
+---
+
+## Deployment
+
+### Option A: Deploy Everything to Railway (Simplest)
 
 1. Push this repo to GitHub
 2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
@@ -48,6 +52,92 @@ Login: `admin` / `admin123`
 5. Railway auto-detects Node.js and runs `node server/index.js`
 
 > **Note**: Railway free tier may not support UDP ports required by WebRTC. For production, use a VPS with ports 40000–40100 UDP open.
+
+---
+
+### Option B: Split Deployment (Vercel Frontend + Railway Backend)
+
+Use this approach to get free static hosting on Vercel while running the backend on Railway.
+
+#### 1. Deploy Backend to Railway
+
+Follow the same Railway steps above. Note your Railway app URL, e.g.:
+```
+https://atombergfinal-production.up.railway.app
+```
+
+#### 2. Deploy Frontend to Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **New Project** → import this repo
+2. **Configure build settings**:
+   - **Framework Preset**: Other
+   - **Root Directory**: `public`
+   - **Build Command**: (leave empty — no build step needed)
+   - **Output Directory**: `.` (serves the `public` folder directly)
+3. Click **Deploy**
+
+#### 3. Configure Frontend → Backend Connection
+
+After deploying, update `public/config.js` with your Railway backend URL:
+
+```js
+window.APP_CONFIG = {
+  BACKEND_URL: "https://atombergfinal-production.up.railway.app"
+};
+```
+
+Commit and push — Vercel will auto-redeploy.
+
+#### 4. Enable CORS on Railway
+
+The backend already has CORS enabled for all origins (`cors: { origin: '*' }`) in both Express and Socket.io, so no additional configuration is needed.
+
+#### Vercel Configuration
+
+Create a `public/vercel.json` (if you want SPA-style routing or custom headers):
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Frontend (Vercel or same server)                            │
+│  ┌──────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ agent    │  │ customer     │  │ admin        │           │
+│  │ .html    │  │ .html        │  │ .html        │           │
+│  └────┬─────┘  └──────┬───────┘  └──────┬───────┘           │
+│       │               │                 │                    │
+│       └───────────┬───┘─────────────────┘                    │
+│                   │ Socket.io + REST (BACKEND_URL)           │
+└───────────────────┼──────────────────────────────────────────┘
+                    │
+┌───────────────────┼──────────────────────────────────────────┐
+│  Backend (Railway / VPS)                                     │
+│  ┌────────────────┴──────────────────────────┐               │
+│  │ Express + Socket.io + Mediasoup SFU       │               │
+│  │ ┌───────────┐ ┌───────────┐ ┌───────────┐ │              │
+│  │ │ REST API  │ │ Signaling │ │ SFU Media │ │              │
+│  │ │ (JWT auth)│ │ (Socket)  │ │ (WebRTC)  │ │              │
+│  │ └───────────┘ └───────────┘ └───────────┘ │              │
+│  └───────────────────────────────────────────┘               │
+│  SQLite DB │ Recordings Dir                                  │
+└──────────────────────────────────────────────────────────────┘
+```
 
 ## Features
 
@@ -60,3 +150,4 @@ Login: `admin` / `admin123`
 - ✅ Admin dashboard with live session monitoring
 - ✅ Session history in SQLite database
 - ✅ JWT-protected agent API
+- ✅ Cross-origin deployment support (Vercel frontend + Railway backend)

@@ -165,9 +165,13 @@
   </div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="config.js"></script>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <script src="/mediasoup-client.js"></script>
 <script>
+// Retrieve backend URL configuration
+const BACKEND_URL = (window.APP_CONFIG && window.APP_CONFIG.BACKEND_URL) || window.location.origin;
+
 // ─── Globals ──────────────────────────────────────────────────────────────────
 let token = localStorage.getItem('agent_token');
 let agentName = localStorage.getItem('agent_name') || 'Agent';
@@ -204,7 +208,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
-    const r = await fetch('/api/auth/login', {
+    const r = await fetch(`${BACKEND_URL}/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value }),
     });
@@ -238,7 +242,7 @@ function showDashboard() {
 async function loadSessions() {
   const tbody = document.getElementById('sessionsBody');
   try {
-    const r = await fetch('/api/sessions', { headers: { Authorization: `Bearer ${token}` } });
+    const r = await fetch(`${BACKEND_URL}/api/sessions`, { headers: { Authorization: `Bearer ${token}` } });
     const sessions = await r.json();
     if (!sessions.length) {
       tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-mute);padding:2rem">No sessions yet. Create one above.</td></tr>`;
@@ -262,14 +266,15 @@ document.getElementById('createSessionBtn').addEventListener('click', async () =
   const btn = document.getElementById('createSessionBtn');
   btn.disabled = true;
   try {
-    const r = await fetch('/api/sessions', {
+    const r = await fetch(`${BACKEND_URL}/api/sessions`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error);
     currentSessionId = data.sessionId;
     currentInviteToken = data.inviteToken;
-    document.getElementById('inviteLinkText').textContent = data.inviteUrl;
+    const inviteUrl = `${window.location.origin}/customer.html?token=${data.inviteToken}`;
+    document.getElementById('inviteLinkText').textContent = inviteUrl;
     document.getElementById('inviteSection').classList.remove('hidden');
     document.getElementById('inviteSection').style.display = 'flex';
     toast('Session created! Share the invite link.', 'success');
@@ -310,7 +315,7 @@ async function initCall() {
     localStream = new MediaStream();
   }
 
-  socket = io();
+  socket = io(BACKEND_URL);
   mySocketId = null;
 
   socket.on('connect', () => {
